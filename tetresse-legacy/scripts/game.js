@@ -241,42 +241,29 @@ class Game {
             // s.executeStatsListeners(p.piece + "spin");
         });
         this.stats.addStatsListener("piecePlaced", function(s) {
-            s.piecesPlaced.add(1);
-
-            // update pp TODO update pp for regular lines cleared and make easier (repeated code in tick)
-            s.spins.total.update("pp");
-            s.finesse.update("pp");
-            s.linesCleared.total.update("pp");
-            for (var i = 0; i < 4; i++)
-                s.linesCleared.count[i].update("pp");
-
-            var str = "ijlstz";
-            for (var j = 0; j < str.length; j++) {
-                s.spins[str.charAt(j)].total.update("ps");
-                for (var k = 0; k < (str.charAt(j) == "i" ? 4 : 3); k++) {
-                    s.spins[str.charAt(j)].count[k].update("pp");
-                }
-            }
-
             // finesse
             var rec = s.board.record;
             var p = s.board.piece;
 
             var weightedCount = 0.0;
+            var hasSd = false;
+            var hasHd = false;
             for (var i = p.keysPressed.length - 1; i >= 0; i--) {
                 var j = p.keysPressed[i].key;
                 if ("hold".indexOf(j) != -1)
                     break;
                 if ("sd".indexOf(j) != -1) {
-                    weightedCount = 0.0;
-                    break;
+                    hasSd = true;
                 }
                 if (("hd").indexOf(j) == -1)
                     weightedCount += 1.0;
+                else
+                    hasHd = true;
                 if (!!p.keysPressed[i].repeated)
                     weightedCount += 0.5;
             }
 
+            var reset = false;
             if (!p.spin) {
                 var v = s.board.getIdealFinesse(p.piece, p.getLocation()[1], p.getRotation(), p.spin);
                 var optimalWeight = 0.0;
@@ -293,15 +280,37 @@ class Game {
                     str = str.substring(0, str.length - 2);
                 else
                     str = "drop"; // TODO put this in settings?
-                if (weightedCount - optimalWeight > 0) {
+                if (!hasSd && weightedCount - optimalWeight > 0) {
                     s.finesse.add(weightedCount - optimalWeight);
                     s.finessePrintout.updateValue(str); // TODO add finesse error (tell user what they did that was wrong)
-                    if (s.board.settings.redoFinesseErrors)
+                    if (s.board.settings.redoFinesseErrors) {
+                        reset = true;
                         p.reset();
+                    }
                     else
                         if (s.board.settings.showFinesseErrors)
                             p.greyOut();
                 }
+            }
+            if (!reset) {
+                s.piecesPlaced.add(1);
+
+                // update pp TODO update pp for regular lines cleared and make easier (repeated code in tick)
+                s.spins.total.update("pp");
+                s.finesse.update("pp");
+                s.linesCleared.total.update("pp");
+                for (var i = 0; i < 4; i++)
+                    s.linesCleared.count[i].update("pp");
+
+                var str = "ijlstz";
+                for (var j = 0; j < str.length; j++) {
+                    s.spins[str.charAt(j)].total.update("ps");
+                    for (var k = 0; k < (str.charAt(j) == "i" ? 4 : 3); k++) {
+                        s.spins[str.charAt(j)].count[k].update("pp");
+                    }
+                }
+
+                s.keys.add(weightedCount + (hasHd ? 1.0 : 0.0)); //add hard drop
             }
         });
         this.stats.addStatsListener("ispin", function(s) {
@@ -967,9 +976,15 @@ class Game {
                 } else if (b.settings.keyCodes[e.keyCode] == "sd") {
                     if (b.boolKeys.sd.down)
                         return;
-                    b.piece.addKeyPressed("sd");
+                    var o = b.piece.addKeyPressed("sd");
                     b.boolKeys.sd.down = true;
+                    var f = true;
                     var m = function() {
+                        if (f) {
+                            f = false;
+                        } else {
+                            o.repeated = true;
+                        }
                         if (!b.piece.canDrop())
                             return;
                         b.piece.addMove(5);
@@ -1562,16 +1577,16 @@ class Game {
     // returns object with all settings: use .label to get a list of labels of the settings
     static getDefaultSettings() {
         var settings = {
-            das: 125, //
-            arr: Math.floor(1000/60),
+            das: 100, //
+            arr: Math.floor(0),
             gravityDelay: 1000,
             maxMoves: 20,
             softDropSpeed: 25,
             displayedBoardHeight: 20,
             displayedBoardWidth: 10,
-            nextPiecesNum: 5,
+            nextPiecesNum: 1,
             boolShadowPiece: true,
-            numNextPieces: 5,
+            numNextPieces: 1,
             keyCodes: {
                 39: "right",
                 37: "left",
@@ -1585,8 +1600,12 @@ class Game {
                 69: "ccw",
                 82: "cw",
                 74: "left",
-                75: "sd",
                 76: "right",
+                75: "ccw",
+                73: "cw",
+                188: "sd",
+                83: "hd",
+                65: "180",
             },
             loadFile: [],
             optionsBarVisible: true,
@@ -1713,6 +1732,10 @@ class Stats {
     reset() {
         // TODO convert name to a setting in stats
         // value stored in time is in milliseconds
+        //this.clock.complete();
+        this.clock = new Clock(this.board, 100, function(b) {
+            b.stats.executeStatsListeners("tick");
+        });
         this.totalTime = new PageStat(["time", this, 0, "t"]);
         this.totalPauseTime = new PageStat(["time-paused", this, 0, "t"]);
         var tempDate = new Date();
@@ -1723,6 +1746,7 @@ class Stats {
         this.piecesPlaced = "pieces-placed";//new PageStat(["pieces-placed", this, 0]);
         this.finesse = "finesse-errors"; // TODO implements finesse
         this.finessePrintout = new PageStat(["finesse-errors-p", this, "-"]);
+        this.keys = "keys";
         this.linesCleared = {
             total: "lines-cleared",
             count: ["singles","doubles","triples","tetrisses"]
@@ -1761,6 +1785,13 @@ class Stats {
         for (var i = 0; i < toLoad.length; i++) {
             var ps = new PageStat([this[toLoad[i]], this, 0, "ps"]);
             this[toLoad[i]] = new PageStat([this[toLoad[i]], this, 0, null, null, [ps]]);
+        }
+
+        var toLoad = ["keys"];
+        for (var i = 0; i < toLoad.length; i++) {
+            var ps = new PageStat([this[toLoad[i]], this, 0, "ps"]);
+            var pp = new PageStat([this[toLoad[i]], this, 0, "pp"]);
+            this[toLoad[i]] = new PageStat([this[toLoad[i]], this, 0, null, null, [ps, pp]]);
         }
 
         toLoad = ["finesse"];
@@ -1867,10 +1898,15 @@ class PageStat {
         if (this.name == null || this.stats == null)
             this.addElements([]);
 
-        var toSearch = this.stats.board.element.id + "-" + this.name;
-        toSearch += (this.type == null || this.type == "t"? "" : "-" + this.type);
+        var baseSerach = this.stats.board.element.id + "-" + this.name;
+        var toSearch = baseSerach + (this.type == null || this.type == "t"? "" : "-" + this.type);
         var eles = document.getElementsByClassName(toSearch);
         this.addElements(eles);
+        if (this.type == "ps") {
+            var toSearch = baseSerach + "-pm";
+            var eles = document.getElementsByClassName(toSearch);
+            this.addElements(eles);
+        }
     }
 
     updateValue(value) {
@@ -1901,8 +1937,12 @@ class PageStat {
         }
         if (this.elements != null) {
             for (var i = 0; i < this.elements.length; i++) {
+                let val = v;
                 if (this.elements[i].matches("div")) { // TODO redesign
-                    this.elements[i].innerHTML = "" + v + (this.append == null ? "" : this.append);
+                    if (this.type == "ps" && this.elements[i].className.endsWith("-pm")) {
+                        val = (val * 60).toFixed(3);
+                    }
+                    this.elements[i].innerHTML = "" + val + (this.append == null ? "" : this.append);
                 } else {
                     console.log(this.name);
                     this.elements.splice(i, 1);
