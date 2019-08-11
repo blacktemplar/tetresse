@@ -50,6 +50,18 @@ body {
     border-spacing: 0px;
 }
 
+#worst-pieces {
+    position: absolute;
+    background: lightblue;
+    top: 40%;
+    left: 65%;
+    width: 30%;
+    padding: 1%;
+    white-space: nowrap;
+    font-size: 1vw;
+    border-spacing: 0px;
+}
+
 td {
     padding: 0px;
 }
