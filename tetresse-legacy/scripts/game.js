@@ -327,12 +327,12 @@ class Game {
                 }
                 let x = s.pieces[s.piece][s.rotation][s.location];
 
-                let wasMaxErrorRatio = x.errors / x.tries == s.maxErrorRatio;
+                let wasMaxErrorRatio = x.errors * 1.0 / x.tries == s.maxErrorRatio;
                 x.tries++;
                 if (pieceError) {
                     x.errors++;
                 }
-                if (x.tries > s.maxTries || wasMaxErrorRatio || x.errors / x.tries > s.maxErrorRatio) {
+                if (x.tries > s.maxTries || wasMaxErrorRatio || x.errors * 1.0 / x.tries > s.maxErrorRatio) {
                     s.piecesWeightSum = 0;
                     s.maxTries = 0;
                     s.maxErrorRatio = 0.0;
@@ -344,8 +344,8 @@ class Game {
                                     if (y.tries > s.maxTries) {
                                         s.maxTries = y.tries;
                                     }
-                                    if (y.errors / y.tries > s.maxErrorRatio) {
-                                        s.maxErrorRatio = y.errors / y.tries;
+                                    if (y.errors * 1.0 / y.tries > s.maxErrorRatio) {
+                                        s.maxErrorRatio = y.errors * 1.0 / y.tries;
                                     }
                                 }
                             }
@@ -356,8 +356,8 @@ class Game {
                             for (let k = 0; k < s.pieces[i][j].length; k++) {
                                 let y = s.pieces[i][j][k];
                                 if (y.tries > 0) {
-                                    y.weight = 10 + Math.round(s.maxErrorRatio > 0.0 ? (100 * y.errors / y.tries / s.maxErrorRatio) : 0.0 +
-                                      100 * Math.min(1.0, Math.max(0, (s.maxTries / 10 - y.tries)) / (s.maxTries / 20)));
+                                    y.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * y.errors / y.tries / s.maxErrorRatio) : 0.0) +
+                                      100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - y.tries)) / (s.maxTries * 1.0 / 20.0)));
                                 }
                                 s.piecesWeightSum += y.weight;
                             }
@@ -365,8 +365,8 @@ class Game {
                     }
                 } else {
                     let oldWeight = x.weight;
-                    x.weight = 10 + Math.round(s.maxErrorRatio > 0.0 ? (100 * x.errors / x.tries / s.maxErrorRatio) : 0.0 +
-                      100 * Math.min(1.0, Math.max(0, (s.maxTries / 10 - x.tries)) / (s.maxTries / 20)));
+                    x.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * x.errors / x.tries / s.maxErrorRatio) : 0.0) +
+                      100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - x.tries)) / (s.maxTries * 1.0 / 20.0)));
                     if (x.weight != oldWeight) {
                         s.piecesWeightSum += x.weight - oldWeight;
                     }
@@ -379,7 +379,7 @@ class Game {
                     for (let j = 0; j < s.pieces[i].length; j++) {
                         for (let k = 0; k < s.pieces[i][j].length; k++) {
                             let x = s.pieces[i][j][k];
-                            s.worstPieces.push([x.tries == 0 ? 1.0 : x.errors / x.tries, x.tries, i, j, k, x.errors]);
+                            s.worstPieces.push([x.tries == 0 ? 1.0 : x.errors * 1.0 / x.tries, x.tries, i, j, k, x.errors]);
                         }
                     }
                 }
@@ -405,6 +405,9 @@ class Game {
                     html += "<td>" + s.worstPieces[i][5] + "/" + s.worstPieces[i][1] + "</td>";
                     html += "</tr>";
                 }
+                html += "<tr><td>" + s.maxTries + "</td></tr>";
+                html += "<tr><td>" + s.maxErrorRatio + "</td></tr>";
+                html += "<tr><td>" + s.piecesWeightSum + "</td></tr>";
                 el.innerHTML = html;
             }
             if (!reset) {
