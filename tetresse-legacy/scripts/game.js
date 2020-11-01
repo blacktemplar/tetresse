@@ -332,6 +332,8 @@ class Game {
                 if (pieceError) {
                     x.errors++;
                 }
+                let min_correct_offset = 3;
+                let error_multiplier = 10;
                 if (x.tries > s.maxTries || wasMaxErrorRatio || x.errors * 1.0 / x.tries > s.maxErrorRatio) {
                     s.piecesWeightSum = 0;
                     s.maxTries = 0;
@@ -356,8 +358,12 @@ class Game {
                             for (let k = 0; k < s.pieces[i][j].length; k++) {
                                 let y = s.pieces[i][j][k];
                                 if (y.tries > 0) {
-                                    y.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * y.errors / y.tries / s.maxErrorRatio) : 0.0) +
-                                      100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - y.tries)) / (s.maxTries * 1.0 / 20.0)));
+                                    if (y.errors * error_multiplier + min_correct_offset <= y.tries) {
+                                      y.weight = 0
+                                    } else {
+                                      y.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * y.errors / y.tries / s.maxErrorRatio) : 0.0) +
+                                          100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - y.tries)) / (s.maxTries * 1.0 / 20.0)));
+                                    }
                                 }
                                 s.piecesWeightSum += y.weight;
                             }
@@ -365,8 +371,12 @@ class Game {
                     }
                 } else {
                     let oldWeight = x.weight;
-                    x.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * x.errors / x.tries / s.maxErrorRatio) : 0.0) +
-                      100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - x.tries)) / (s.maxTries * 1.0 / 20.0)));
+                    if (x.errors * error_multiplier + min_correct_offset <= x.tries) {
+                        x.weight = 0
+                    } else {
+                        x.weight = 10 + Math.round((s.maxErrorRatio > 0.0 ? (100.0 * x.errors / x.tries / s.maxErrorRatio) : 0.0) +
+                            100 * Math.min(1.0, Math.max(0, (s.maxTries * 1.0 / 10.0 - x.tries)) / (s.maxTries * 1.0 / 20.0)));
+                    }
                     if (x.weight != oldWeight) {
                         s.piecesWeightSum += x.weight - oldWeight;
                     }
@@ -1240,62 +1250,66 @@ class Game {
             // every new piece's turn starts here
             if (this.settings.dynamicTraining) {
                 this._resetGame();
-                let sum = 0;
-                let piece = null;
-                const pieceLetters = "ijlostz";
-                while (piece == null) {
-                    let random = Math.floor(Math.random() * this.stats.piecesWeightSum);
-                    loop:
-                      for (let i = 0; i < this.stats.pieces.length; i++) {
-                          for (let j = 0; j < this.stats.pieces[i].length; j++) {
-                              for (let k = 0; k < this.stats.pieces[i][j].length; k++) {
-                                  sum += this.stats.pieces[i][j][k].weight;
-                                  if (random < sum) {
-                                      if (this.stats.piece != i || this.stats.rotation != j ||
-                                        this.stats.location != k) {
-                                          this.stats.piece = i;
-                                          this.stats.rotation = j;
-                                          this.stats.location = k;
-                                          piece = new Piece(pieceLetters[i], this);
-                                          const pieceL = pieceLetters[i];
+                if (this.stats.piecesWeightSum === 0) {
+                  this.gameOver = true;
+                } else {
+                    let sum = 0;
+                    let piece = null;
+                    const pieceLetters = "ijlostz";
+                    while (piece == null) {
+                        let random = Math.floor(Math.random() * this.stats.piecesWeightSum);
+                        loop:
+                          for (let i = 0; i < this.stats.pieces.length; i++) {
+                              for (let j = 0; j < this.stats.pieces[i].length; j++) {
+                                  for (let k = 0; k < this.stats.pieces[i][j].length; k++) {
+                                      sum += this.stats.pieces[i][j][k].weight;
+                                      if (random < sum) {
+                                          if (this.stats.piece != i || this.stats.rotation != j ||
+                                            this.stats.location != k || (this.stats.piecesWeightSum === this.stats.pieces[i][j][k].weight)) {
+                                              this.stats.piece = i;
+                                              this.stats.rotation = j;
+                                              this.stats.location = k;
+                                              piece = new Piece(pieceLetters[i], this);
+                                              const pieceL = pieceLetters[i];
 
-                                          //fill predefined game
-                                          for (let x = 0; x < 10; x++) {
-                                              for (let y = 0; y < 4; y++) {
-                                                  let filled = true;
-                                                  if ((y == 3 && x >= k && x < k + 4 && pieceL == "i" && j == 0)
-                                                    || (x == k && pieceL == "i" && j == 1)
-                                                    || (y == 3 && x >= k && x < k + 3 && "jlt".indexOf(pieceL) != -1 && j == 0)
-                                                    || (y >= 2 && x >= k && x < k + 2 && pieceL == "o")
-                                                    || (y == 3 && x >= k && x < k + 2 && ((pieceL == "j" && j == 3) || (pieceL == "l" && j == 1) || (pieceL == "s" && j == 0)))
-                                                    || (((y == 2 && x == k) || (y == 3 && x >= k && x < k + 3)) && pieceL == "l" && j == 2)
-                                                    || (((y == 2 && x == k + 2) || (y == 3 && x >= k && x < k + 3)) && pieceL == "j" && j == 2)
-                                                    || (((y >= 1 && x == k) || (y == 3 && x >= k && x < k + 2)) && pieceL == "j" && j == 1)
-                                                    || (((y >= 1 && x == k + 1) || (y == 3 && x >= k && x < k + 2)) && pieceL == "l" && j == 3)
-                                                    || (y == 3 && x >= k + 1 && x < k + 3 && pieceL == "z" && j == 0)
-                                                    || (((y == 2 && x == k) || (y == 3 && x >= k && x < k + 2)) && "tz".indexOf(pieceL) != -1 && j == 1)
-                                                    || (((y == 2 && x == k + 1) || (y == 3 && x >= k && x < k + 2)) && ((pieceL == "t" && j == 3) || (pieceL == "s" && j == 1)))
-                                                    || (((y == 2 && x == k + 1) || (y == 3 && x >= k && x < k + 3)) && pieceL == "t" && j == 2)) {
-                                                      filled = false;
-                                                  }
-                                                  if (filled) {
-                                                      let ele = this.board.tiles[39-y][x].element;
-                                                      if (ele !== null)
-                                                          ele.classList.add(pieceL);
-                                                      this.board.tiles[39-y][x].p = pieceL;
+                                              //fill predefined game
+                                              for (let x = 0; x < 10; x++) {
+                                                  for (let y = 0; y < 4; y++) {
+                                                      let filled = true;
+                                                      if ((y == 3 && x >= k && x < k + 4 && pieceL == "i" && j == 0)
+                                                        || (x == k && pieceL == "i" && j == 1)
+                                                        || (y == 3 && x >= k && x < k + 3 && "jlt".indexOf(pieceL) != -1 && j == 0)
+                                                        || (y >= 2 && x >= k && x < k + 2 && pieceL == "o")
+                                                        || (y == 3 && x >= k && x < k + 2 && ((pieceL == "j" && j == 3) || (pieceL == "l" && j == 1) || (pieceL == "s" && j == 0)))
+                                                        || (((y == 2 && x == k) || (y == 3 && x >= k && x < k + 3)) && pieceL == "l" && j == 2)
+                                                        || (((y == 2 && x == k + 2) || (y == 3 && x >= k && x < k + 3)) && pieceL == "j" && j == 2)
+                                                        || (((y >= 1 && x == k) || (y == 3 && x >= k && x < k + 2)) && pieceL == "j" && j == 1)
+                                                        || (((y >= 1 && x == k + 1) || (y == 3 && x >= k && x < k + 2)) && pieceL == "l" && j == 3)
+                                                        || (y == 3 && x >= k + 1 && x < k + 3 && pieceL == "z" && j == 0)
+                                                        || (((y == 2 && x == k) || (y == 3 && x >= k && x < k + 2)) && "tz".indexOf(pieceL) != -1 && j == 1)
+                                                        || (((y == 2 && x == k + 1) || (y == 3 && x >= k && x < k + 2)) && ((pieceL == "t" && j == 3) || (pieceL == "s" && j == 1)))
+                                                        || (((y == 2 && x == k + 1) || (y == 3 && x >= k && x < k + 3)) && pieceL == "t" && j == 2)) {
+                                                          filled = false;
+                                                      }
+                                                      if (filled) {
+                                                          let ele = this.board.tiles[39-y][x].element;
+                                                          if (ele !== null)
+                                                              ele.classList.add(pieceL);
+                                                          this.board.tiles[39-y][x].p = pieceL;
+                                                      }
                                                   }
                                               }
                                           }
+                                          break loop;
                                       }
-                                      break loop;
                                   }
                               }
                           }
-                      }
+                    }
+                    this.nextPieces.push(piece);
+                    this.nextPieces.push(piece);
+                    this.updateQueue();
                 }
-                this.nextPieces.push(piece);
-                this.nextPieces.push(piece);
-                this.updateQueue();
             }
             this.stats.executeStatsListeners("pieceSpawn");
             this.piece = this.nextPieces.splice(0, 1)[0];

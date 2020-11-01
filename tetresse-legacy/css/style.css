@@ -191,7 +191,7 @@ span {
     height: 5%;
 }
 
-div .i {
+div .s {
     background: hsl(196, 89%, 57%);
     border: 1px solid hsl(191, 100%, 64%);
 }
@@ -199,23 +199,23 @@ div .j {
     background: hsl(231, 69%, 45%);
     border: 1px solid hsl(222, 65%, 50%);
 }
-div .l {
-    background: hsl(24, 98%, 44%);
-    border: 1px solid hsl(27, 91%, 52%);
+div .z {
+    background: rgb(255, 255, 255); 
+    border: 1px solid rgb(245, 245, 245);
 }
 div .o {
     background: hsl(42, 97%, 45%);
     border: 1px solid hsl(41, 92%, 58%);
 }
-div .s {
+div .i {
     background: hsl(92, 91%, 37%);
     border: 1px solid hsl(90, 76%, 46%);
 }
-div .t {
+div .l {
     background: hsl(314, 63%, 41%);
     border: 1px solid hsl(310, 60%, 48%);
 }
-div .z {
+div .t {
     background: hsl(348, 86%, 45%);
     border: 1px solid hsl(350, 98%, 61%);
 }
